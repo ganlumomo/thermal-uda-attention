@@ -42,7 +42,7 @@ def run(args):
     # init model
     tasks = ['source', 'target']
     squeeze = True
-    adapters = False
+    adapters = True
     train_norm_layers = True
     model = se_resnet50(n_classes=args.n_classes,
                         pretrained='imagenet',
@@ -55,10 +55,6 @@ def run(args):
         c = torch.load(args.trained)
         model.load_state_dict(c['model'])
         logger.info('Loaded `{}`'.format(args.trained))
-
-    # fix shared parameters in backbone
-    for param in get_lr_params(model, part='backbone', tasks=tasks):
-        param.requires_grad = False
 
     # log parameters
     config={
@@ -124,7 +120,7 @@ if __name__ == '__main__':
     parser.add_argument('--trained', type=str, default='')
     parser.add_argument('--slope', type=float, default=0.2)
     # train
-    parser.add_argument('--lr', type=float, default=1e-5)
+    parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--t_lr', type=float, default=1e-5)
     parser.add_argument('--d_lr', type=float, default=1e-3)
     parser.add_argument('--betas', type=float, nargs='+', default=(.5, .999))

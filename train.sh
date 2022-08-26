@@ -1,2 +1,2 @@
 python core/main.py \
---device cuda:1 --logdir outputs/exp1
+--device cuda:1 --logdir outputs/seperate_train_source_target

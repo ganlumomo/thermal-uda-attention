@@ -5,7 +5,7 @@ from time import time
 import numpy as np
 from sklearn.metrics import accuracy_score
 import torch
-from utils.utils import AverageMeter, save
+from utils.utils import AverageMeter, save, save_d
 
 def lr_poly(base_lr, iter_, max_iter, power=0.9):
     return base_lr * ((1 - float(iter_) / max_iter) ** power)
@@ -83,6 +83,13 @@ def train_model(
                 'val/avg_acc': best_score,
             }
             save(args.logdir, state_dict, is_best)
+            state_dict = {
+                'model': discriminator.state_dict(),
+                'optimizer': optimizer_d.state_dict(),
+                'epoch': epoch_i,
+                'val/avg_acc': best_score,
+            }
+            save_d(args.logdir, state_dict, is_best)
             for cls_idx, clss in enumerate(clsNames):
                 logger.info('{}: {}'.format(clss, validation['classAcc'][cls_idx]))
             logger.info('Current val. acc.: {}'.format(validation['avgAcc']))
@@ -137,7 +144,6 @@ def train(
         for param in discriminator.parameters():
             param.requires_grad = False
         source_pred, source_feat = model(source_data, task='source')
-        target_pred, target_feat = model(target_data, task='target')
         lossS = criterion(source_pred, source_label)
         # self-training
         '''
@@ -156,6 +162,7 @@ def train(
         losses.update(loss.item(), bs)
 
         # Train target params
+        target_pred, target_feat = model(target_data, task='target')
         D_output_target = discriminator(target_feat)
         lossG = d_criterion(D_output_target, D_label_source)
         t_optimizer.zero_grad()
@@ -165,6 +172,8 @@ def train(
         # Train discriminator
         for param in discriminator.parameters():
             param.requires_grad = True
+        _, source_feat = model(source_data, task='source')
+        _, target_feat = model(target_data, task='target')
         D_output_source = discriminator(source_feat.detach())
         D_output_target = discriminator(target_feat.detach())
         D_output = torch.cat([D_output_source, D_output_target], dim=0)
@@ -200,6 +209,13 @@ def train(
                 'val/avg_acc': best_score,
             }
             save(args.logdir, state_dict, is_best)
+            state_dict = {
+                'model': discriminator.state_dict(),
+                'optimizer': optimizer_d.state_dict(),
+                'epoch': epoch_i,
+                'val/avg_acc': best_score,
+            }
+            save_d(args.logdir, state_dict, is_best)
             logger.info('Epoch_{} Iter_{}'.format(epoch_i, iter_i))
             for cls_idx, clss in enumerate(clsNames):
                 logger.info('{}: {}'.format(clss, validation['classAcc'][cls_idx]))
