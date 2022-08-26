@@ -85,7 +85,7 @@ def train_model(
             save(args.logdir, state_dict, is_best)
             state_dict = {
                 'model': discriminator.state_dict(),
-                'optimizer': optimizer_d.state_dict(),
+                'optimizer': d_optimizer.state_dict(),
                 'epoch': epoch_i,
                 'val/avg_acc': best_score,
             }
@@ -211,7 +211,7 @@ def train(
             save(args.logdir, state_dict, is_best)
             state_dict = {
                 'model': discriminator.state_dict(),
-                'optimizer': optimizer_d.state_dict(),
+                'optimizer': d_optimizer.state_dict(),
                 'epoch': epoch_i,
                 'val/avg_acc': best_score,
             }
