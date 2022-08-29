@@ -124,7 +124,7 @@ def get_m3fd(dataset_root, batch_size, train):
         pre_process = transforms.Compose([transforms.Resize((224, 224)),
                                       transforms.ToTensor(),
                                       transforms.Normalize(
-                                          mean=(0.4810, 0.4810, 0.4810),
+                                          mean=(0.4821, 0.4821, 0.4821),
                                           std=(0.2081, 0.2081, 0.2081))])
         m3fd_dataset = datasets.ImageFolder(root=os.path.join(dataset_root, 'uda_data/m3fd/train'),
                                              transform=pre_process)
