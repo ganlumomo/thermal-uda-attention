@@ -236,7 +236,7 @@ def get_flir_from_list_wdomain(dataset_root, batch_size, train):
                                       transforms.Normalize(
                                           mean=(0.5776, 0.5776, 0.5776),
                                           std=(0.1319, 0.1319, 0.1319))])
-        flir_dataset = ImageFileListWeightDomain(root=dataset_root, imageFolder='uda_data/flir/train', flist=os.path.join(dataset_root, 'uda_data/flir', 'validation_wconf_wdomain_weights.txt'),
+        flir_dataset = ImageFileListWeightDomain(root=dataset_root, imageFolder='uda_data/flir/train', flist=os.path.join(dataset_root, 'uda_data/flir', 'pseudo_labels_flir.txt'),
                                             transform=pre_process)
         weight = flir_dataset.weights
         weight = torch.DoubleTensor(weight)
