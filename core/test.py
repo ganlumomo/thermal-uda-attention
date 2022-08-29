@@ -8,11 +8,13 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from networks.se_resnet_attention import se_resnet50, get_lr_params
 from networks.discriminator import Discriminator
+from networks.resnet50off import CNN
 from core.trainer import train_model
 from utils.utils import get_logger
 from utils.altutils import get_mscoco, get_flir
 from utils.altutils import get_m3fd
 from utils.altutils import setLogger
+from utils.analysis import collect_feature, tsne
 from sklearn.metrics import accuracy_score
 import numpy as np
 import logging
@@ -30,7 +32,7 @@ def run(args):
     source_val_loader = get_mscoco(dataset_root, args.batch_size, train=False)
     if args.tgt_cat == 'flir':
         target_train_loader, data_path = get_flir(dataset_root, args.batch_size, train=True, pseudo_label=True)
-        #target_val_loader = get_flir(dataset_root, args.batch_size, train=False)
+        target_val_loader = get_flir(dataset_root, args.batch_size, train=False)
     elif args.tgt_cat == 'm3fd':
         target_train_loader = get_m3fd(dataset_root, args.batch_size, train=True)
         target_val_loader = get_m3fd(dataset_root, args.batch_size, train=False)
@@ -65,6 +67,29 @@ def run(args):
         c = torch.load(args.d_trained)
         discriminator.load_state_dict(c['model'])
         logger.info('Loaded `{}`'.format(args.d_trained))
+
+    # Model Analysis
+    '''
+    source_cnn = CNN(in_channels=args.in_channels).to(args.device)
+    if os.path.isfile(args.trained):
+        c = torch.load(args.trained)
+        source_cnn.load_state_dict(c['model'])
+    logger.info('Loaded `{}`'.format(args.trained))
+    target_cnn = CNN(in_channels=args.in_channels).to(args.device)
+    if os.path.isfile(args.d_trained):
+        c = torch.load(args.d_trained)
+        target_cnn.load_state_dict(c['model'])
+    logger.info('Loaded `{}`'.format(args.d_trained))
+    '''
+
+    #source_feature, source_label = collect_feature(target_val_loader, source_cnn.encoder, args.device, task=None)
+    target_feature, target_label = collect_feature(target_val_loader, model, args.device, task='target')
+    # plot t-SNE
+    tSNE_filename = os.path.join(args.logdir, 'TSNE.pdf')
+    #tsne.visualize(source_feature, target_feature, tSNE_filename)
+    tsne.visualize_cls(target_feature, target_label, tSNE_filename)
+    print("Saving t-SNE to", tSNE_filename)
+    return
 
     # testing
     testing = test(model, discriminator, target_train_loader, task='target', datapath=data_path, args=args)

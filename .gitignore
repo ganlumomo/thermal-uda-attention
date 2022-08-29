@@ -1,6 +1,7 @@
 dataset_dir*
 wandb*
 outputs*
+sgada_domain*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
