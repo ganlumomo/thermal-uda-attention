@@ -18,6 +18,11 @@ def adjust_learning_rate(optimizer, base_lr, iter_, max_iter):
     if len(optimizer.param_groups) > 1:
         optimizer.param_groups[1]['lr'] = lr * 10
 
+def set_params_grad(optimizer, requires_grad=False):
+    for i in range(len(optimizer.param_groups)):
+        for param in optimizer.param_groups[i]['params']:
+            param.requires_grad=requires_grad
+
 def train_model(
     model,
     discriminator,
@@ -146,10 +151,8 @@ def train(
         # Train source params
         for param in discriminator.parameters():
             param.requires_grad = False
-        for param in get_lr_params(model, part='task_specific', tasks=['target']):
-            param.requires_grad = False
-        for param in get_lr_params(model, part='task_specific', tasks=['source']):
-            param.requires_grad = True
+        set_params_grad(t_optimizer, requires_grad=False)
+        set_params_grad(optimizer, requires_grad=True)
         source_pred, source_feat = model(source_data, task='source')
         lossS = criterion(source_pred, source_label)
         # self-training
@@ -169,10 +172,8 @@ def train(
         losses.update(loss.item(), bs)
 
         # Train target params
-        for param in get_lr_params(model, part='task_specific', tasks=['source']):
-            param.requires_grad = False
-        for param in get_lr_params(model, part='task_specific', tasks=['target']):
-            param.requires_grad = True
+        set_params_grad(optimizer, requires_grad=False)
+        set_params_grad(t_optimizer, requires_grad=True)
         target_pred, target_feat = model(target_data, task='target')
         D_output_target = discriminator(target_feat)
         lossG = d_criterion(D_output_target, D_label_source)
