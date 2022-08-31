@@ -1,3 +1,3 @@
-python core/test.py \
---device cuda:0 --logdir outputs/seperate_train_source_target/ \
---trained outputs/seperate_train_source_target/best_model.pt \
+python core/test.py --tgt_cat m3fd --n_classes 6 \
+--trained outputs/m3fd_2/best_model.pt \
+--device cuda:1 --logdir outputs/ours_m3fd_2 \

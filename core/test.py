@@ -21,6 +21,17 @@ import logging
 import wandb
 
 
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+def count_task_parameters(model, task):
+    def ismember(layer_txt, tasks):
+        exists = False
+        for task in tasks:
+            exists = exists or layer_txt.find(task) > 0
+            return exists
+    return sum(p.numel() for name, p in model.named_parameters() if ismember(name, task) and p.requires_grad)
+
 def run(args):
     if not os.path.exists(args.logdir):
         os.makedirs(args.logdir)
@@ -35,10 +46,9 @@ def run(args):
         target_val_loader = get_flir(dataset_root, args.batch_size, train=False)
     elif args.tgt_cat == 'm3fd':
         target_train_loader = get_m3fd(dataset_root, args.batch_size, train=True)
-        target_val_loader = get_m3fd(dataset_root, args.batch_size, train=False)
+        target_val_loader = get_m3fd(dataset_root, args.batch_size, train=False, test=True)
     else:
         raise ValueError("Target dataset {} is not defined.".format(args.tgt_cat))
-
 
     args.classInfo = {'classes': torch.unique(torch.tensor(source_val_loader.dataset.targets)),
                       'classNames': source_val_loader.dataset.classes}
@@ -60,41 +70,43 @@ def run(args):
         c = torch.load(args.trained)
         model.load_state_dict(c['model'])
         logger.info('Loaded `{}`'.format(args.trained))
-
+    
     # load discriminator
     discriminator = Discriminator(args=args).to(args.device)
     if os.path.isfile(args.d_trained):
         c = torch.load(args.d_trained)
         discriminator.load_state_dict(c['model'])
         logger.info('Loaded `{}`'.format(args.d_trained))
-
-    # Model Analysis
-    '''
+    
+    # load baselines
     source_cnn = CNN(in_channels=args.in_channels).to(args.device)
-    if os.path.isfile(args.trained):
-        c = torch.load(args.trained)
+    if os.path.isfile(args.s_trained):
+        c = torch.load(args.s_trained)
         source_cnn.load_state_dict(c['model'])
-    logger.info('Loaded `{}`'.format(args.trained))
+        logger.info('Loaded `{}`'.format(args.s_trained))
     target_cnn = CNN(in_channels=args.in_channels).to(args.device)
-    if os.path.isfile(args.d_trained):
-        c = torch.load(args.d_trained)
+    if os.path.isfile(args.t_trained):
+        c = torch.load(args.t_trained)
         target_cnn.load_state_dict(c['model'])
-    logger.info('Loaded `{}`'.format(args.d_trained))
-    '''
+        logger.info('Loaded `{}`'.format(args.t_trained))
 
-    #source_feature, source_label = collect_feature(target_val_loader, source_cnn.encoder, args.device, task=None)
-    target_feature, target_label = collect_feature(target_val_loader, model, args.device, task='target')
+    '''
+    # Model Analysis
+    source_feature, source_label = collect_feature(target_val_loader, source_cnn.encoder, args.device, task=None)
+    #target_feature, target_label = collect_feature(target_val_loader, model, args.device, task='target')
     # plot t-SNE
     tSNE_filename = os.path.join(args.logdir, 'TSNE.pdf')
     #tsne.visualize(source_feature, target_feature, tSNE_filename)
-    tsne.visualize_cls(target_feature, target_label, tSNE_filename)
+    tsne.visualize_cls(source_feature, source_label, tSNE_filename)
     print("Saving t-SNE to", tSNE_filename)
     return
+    '''
 
     # testing
-    testing = test(model, discriminator, target_train_loader, task='target', datapath=data_path, args=args)
+    testing = test(model, discriminator, target_val_loader, task='target', datapath=None, args=args)
     best_acc = testing['avgAcc']
     best_class = testing['classAcc']
+    classNames = testing['classNames']
 
     # log results
     bestClassWiseDict = {}
@@ -108,8 +120,12 @@ def run(args):
 
 def step(model, data, label, task, args):
     data, label = data.to(args.device), label.to(args.device)
-    output, feat = model(data, task=task)
-    return output, feat
+    if task:
+        output, feat  = model(data, task=task)
+        return output
+    else:
+        output = model(data)
+    return output
 
 def test(model, discriminator, dataloader, task, datapath=None, args=None):
     model.eval()
@@ -128,7 +144,7 @@ def test(model, discriminator, dataloader, task, datapath=None, args=None):
             f = open('pseudo_labels.txt', 'w')
         for iter_i, (data, label) in enumerate(dataloader):
             bs = label.size(0)
-            output, d_input = step(model, data, label, task, args)
+            output = step(model, data, label, task, args)
             pred_cls = output.data.max(1)[1]
             acc_ev += pred_cls.cpu().eq(label.data).cpu().sum()
             for class_idx, class_id in enumerate(classes):
@@ -147,7 +163,7 @@ def test(model, discriminator, dataloader, task, datapath=None, args=None):
             probas.extend(output.cpu().numpy().tolist())
     probas = np.asarray(probas)
     preds = np.argmax(probas, axis=1)
-    acc = accuracy_score(targets, preds)
+    acc = accuracy_score(labels, preds)
     class_acc /= class_len
     avgAcc = 0.0
     for i in range(len(class_acc)):
@@ -165,6 +181,8 @@ if __name__ == '__main__':
     parser.add_argument('--n_classes', type=int, default=3)
     parser.add_argument('--trained', type=str, default='')
     parser.add_argument('--d_trained', type=str, default='')
+    parser.add_argument('--s_trained', type=str, default='')
+    parser.add_argument('--t_trained', type=str, default='')
     parser.add_argument('--slope', type=float, default=0.2)
     # train
     parser.add_argument('--lr', type=float, default=1e-4)

@@ -132,7 +132,7 @@ def get_mscoco(dataset_root, batch_size, train):
     return mscoco_data_loader
 
 
-def get_m3fd(dataset_root, batch_size, train):
+def get_m3fd(dataset_root, batch_size, train, test=False):
     """Get M3FD datasets loader
 
     Args:
@@ -169,8 +169,12 @@ def get_m3fd(dataset_root, batch_size, train):
                                       transforms.Normalize(
                                           mean=(0.4810, 0.4810, 0.4810),
                                           std=(0.2081, 0.2081, 0.2081))])
-        m3fd_dataset = datasets.ImageFolder(root=os.path.join(dataset_root, 'uda_data/m3fd/val'),
-                                            transform=pre_process)
+        if test:
+            m3fd_dataset = datasets.ImageFolder(root=os.path.join(dataset_root, 'uda_data/m3fd/test'),
+                                                transform=pre_process)
+        else:
+            m3fd_dataset = datasets.ImageFolder(root=os.path.join(dataset_root, 'uda_data/m3fd/val'),
+                                                transform=pre_process)
         m3fd_data_loader = torch.utils.data.DataLoader(
             dataset=m3fd_dataset,
             batch_size=batch_size,
