@@ -7,6 +7,7 @@ from sklearn.metrics import accuracy_score
 import torch
 from utils.utils import AverageMeter, save, save_d
 from utils.altutils import ForeverDataIterator
+from networks.se_resnet_attention import get_lr_params
 
 def lr_poly(base_lr, iter_, max_iter, power=0.9):
     return base_lr * ((1 - float(iter_) / max_iter) ** power)
@@ -147,7 +148,7 @@ def train(
             param.requires_grad = False
         for param in get_lr_params(model, part='task_specific', tasks=['target']):
             param.requires_grad = False
-        for param in get_lr_params(model, part='generic', tasks=['target']):
+        for param in get_lr_params(model, part='task_specific', tasks=['source']):
             param.requires_grad = True
         source_pred, source_feat = model(source_data, task='source')
         lossS = criterion(source_pred, source_label)
@@ -168,7 +169,7 @@ def train(
         losses.update(loss.item(), bs)
 
         # Train target params
-        for param in get_lr_params(model, part='generic', tasks=['target']):
+        for param in get_lr_params(model, part='task_specific', tasks=['source']):
             param.requires_grad = False
         for param in get_lr_params(model, part='task_specific', tasks=['target']):
             param.requires_grad = True
