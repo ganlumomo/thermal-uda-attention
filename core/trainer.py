@@ -145,6 +145,10 @@ def train(
         # Train source params
         for param in discriminator.parameters():
             param.requires_grad = False
+        for param in get_lr_params(model, part='task_specific', tasks=['target']):
+            param.requires_grad = False
+        for param in get_lr_params(model, part='generic', tasks=['target']):
+            param.requires_grad = True
         source_pred, source_feat = model(source_data, task='source')
         lossS = criterion(source_pred, source_label)
         # self-training
@@ -164,6 +168,10 @@ def train(
         losses.update(loss.item(), bs)
 
         # Train target params
+        for param in get_lr_params(model, part='generic', tasks=['target']):
+            param.requires_grad = False
+        for param in get_lr_params(model, part='task_specific', tasks=['target']):
+            param.requires_grad = True
         target_pred, target_feat = model(target_data, task='target')
         D_output_target = discriminator(target_feat)
         lossG = d_criterion(D_output_target, D_label_source)
