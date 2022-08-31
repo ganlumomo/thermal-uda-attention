@@ -9,6 +9,29 @@ import logging
 from utils.imageFileList import ImageFileList
 from utils.imageFileListWeightDomain import ImageFileListWeightDomain
 
+class ForeverDataIterator:
+    r"""A data iterator that will never stop producing data"""
+
+    def __init__(self, data_loader: data.DataLoader, device=None):
+        self.data_loader = data_loader
+        self.iter = iter(self.data_loader)
+        self.device = device
+
+    def __next__(self):
+        try:
+            data = next(self.iter)
+            if self.device is not None:
+                data = send_to_device(data, self.device)
+        except StopIteration:
+            self.iter = iter(self.data_loader)
+            data = next(self.iter)
+            if self.device is not None:
+                data = send_to_device(data, self.device)
+        return data
+
+    def __len__(self):
+        return len(self.data_loader)
+
 
 def readConfigFile(filePath):
     """
@@ -75,7 +98,8 @@ def get_mscoco(dataset_root, batch_size, train):
     """  
     if train:
         pre_process = transforms.Compose([
-            transforms.Resize((224, 224)), 
+            transforms.Resize((224, 224)),
+            transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=(0.4017, 0.3791, 0.3656), std=(0.2093, 0.2019, 0.1996))
         ])
@@ -122,6 +146,7 @@ def get_m3fd(dataset_root, batch_size, train):
     # dataset and data loader
     if train:
         pre_process = transforms.Compose([transforms.Resize((224, 224)),
+                                      transforms.RandomHorizontalFlip(),
                                       transforms.ToTensor(),
                                       transforms.Normalize(
                                           mean=(0.4821, 0.4821, 0.4821),

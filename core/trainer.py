@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 import torch
 from utils.utils import AverageMeter, save, save_d
+from utils.altutils import ForeverDataIterator
 
 def lr_poly(base_lr, iter_, max_iter, power=0.9):
     return base_lr * ((1 - float(iter_) / max_iter) ** power)
@@ -118,14 +119,15 @@ def train(
     best_class_score = best_class_score
 
     losses, d_losses = AverageMeter(), AverageMeter()
-    n_iters = min(len(source_loader), len(target_loader))
+    #n_iters = min(len(source_loader), len(target_loader))
+    n_iters = 2500
     valSteps = n_iters//args.num_val
     valStepsList = [valSteps+(x*valSteps) for x in range(args.num_val)]
     vals = valStepsList[:-1]
-    source_iter, target_iter = iter(source_loader), iter(target_loader)
+    source_iter, target_iter = ForeverDataIterator(source_loader), ForeverDataIterator(target_loader)
     for iter_i in range(n_iters):
-        source_data, source_label = source_iter.next()
-        target_data, target_label = target_iter.next()
+        source_data, source_label = next(source_iter)
+        target_data, target_label = next(target_iter)
         #target_data, target_target, target_conf, target_domain, target_domain_conf = target_iter.next()
         #target_conf = target_conf.to(args.device)
         #target_domain = target_domain.to(args.device)

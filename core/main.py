@@ -11,6 +11,7 @@ from networks.discriminator import Discriminator
 from core.trainer import train_model
 from utils.utils import get_logger
 from utils.altutils import get_mscoco, get_flir, get_flir_from_list_wdomain
+from utils.altutils import get_m3fd
 from utils.altutils import setLogger
 import logging
 import wandb
@@ -31,9 +32,16 @@ def run(args):
     dataset_root = './dataset_dir/'
     source_train_loader = get_mscoco(dataset_root, args.batch_size, train=True)
     source_val_loader = get_mscoco(dataset_root, args.batch_size, train=False)
-    target_train_loader = get_flir(dataset_root, args.batch_size, train=True)
-    target_val_loader = get_flir(dataset_root, args.batch_size, train=False)
-    target_conf_train_loader = get_flir_from_list_wdomain(dataset_root, args.batch_size, train=True)
+    if args.tgt_cat == 'flir':
+        target_train_loader = get_flir(dataset_root, args.batch_size, train=True)
+        target_val_loader = get_flir(dataset_root, args.batch_size, train=False)
+        target_conf_train_loader = get_flir_from_list_wdomain(dataset_root, args.batch_size, train=True)
+    elif args.tgt_cat == 'm3fd':
+        target_train_loader = get_m3fd(dataset_root, args.batch_size, train=True)
+        target_val_loader = get_m3fd(dataset_root, args.batch_size, train=False)
+    else:
+        raise ValueError("Target dataset {} is not defined.".format(args.tgt_cat))
+
 
     args.classInfo = {'classes': torch.unique(torch.tensor(source_train_loader.dataset.targets)),
                       'classNames': source_train_loader.dataset.classes}
@@ -132,7 +140,7 @@ if __name__ == '__main__':
     parser.add_argument('--thr_domain', type=float, default=0.87)
     parser.add_argument('--num_val', type=int, default=6)  # number of val. within each epoch
     # misc
-    parser.add_argument('--device', type=str, default='cuda:1')
+    parser.add_argument('--device', type=str, default='cuda:0')
     parser.add_argument('--n_workers', type=int, default=4)
     parser.add_argument('--logdir', type=str, default='outputs/')
     # office dataset categories
