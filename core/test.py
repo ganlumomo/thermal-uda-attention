@@ -45,7 +45,7 @@ def run(args):
         target_train_loader, data_path = get_flir(dataset_root, args.batch_size, train=True, pseudo_label=True)
         target_val_loader = get_flir(dataset_root, args.batch_size, train=False)
     elif args.tgt_cat == 'm3fd':
-        target_train_loader = get_m3fd(dataset_root, args.batch_size, train=True)
+        target_train_loader, data_path = get_m3fd(dataset_root, args.batch_size, train=True, pseudo_label=True)
         target_val_loader = get_m3fd(dataset_root, args.batch_size, train=False, test=True)
     else:
         raise ValueError("Target dataset {} is not defined.".format(args.tgt_cat))
@@ -103,6 +103,7 @@ def run(args):
     '''
 
     # testing
+    #testing = test(target_cnn, discriminator, target_val_loader, task=None, datapath=None, args=args)
     testing = test(model, discriminator, target_val_loader, task='target', datapath=None, args=args)
     best_acc = testing['avgAcc']
     best_class = testing['classAcc']
@@ -122,10 +123,10 @@ def step(model, data, label, task, args):
     data, label = data.to(args.device), label.to(args.device)
     if task:
         output, feat  = model(data, task=task)
-        return output
     else:
         output = model(data)
-    return output
+        feat = model.encoder(data)
+    return output, feat
 
 def test(model, discriminator, dataloader, task, datapath=None, args=None):
     model.eval()
@@ -144,7 +145,7 @@ def test(model, discriminator, dataloader, task, datapath=None, args=None):
             f = open('pseudo_labels.txt', 'w')
         for iter_i, (data, label) in enumerate(dataloader):
             bs = label.size(0)
-            output = step(model, data, label, task, args)
+            output, d_input = step(model, data, label, task, args)
             pred_cls = output.data.max(1)[1]
             acc_ev += pred_cls.cpu().eq(label.data).cpu().sum()
             for class_idx, class_id in enumerate(classes):
@@ -156,7 +157,8 @@ def test(model, discriminator, dataloader, task, datapath=None, args=None):
                 d_output = discriminator(d_input)
                 d_pred_cls = d_output.data.max(1)[1]
                 d_output = torch.softmax(d_output, dim=1)
-                weight = [17.13749324689357, 1.6411775357632512, 3.0090590020868904]
+                #weight = [17.13749324689357, 1.6411775357632512, 3.0090590020868904] # flir
+                weight = [57.05215419501134, 1.940010794972627, 13.228180862250262, 65.86387434554973, 2.8688711516533636, 36.14942528735632] # m3fd
                 f.write(datapath[int(iter_i)][0][34:] + ' ' + str(pred_cls[0].cpu().numpy()) + ' ' + str(output[0, pred_cls][0].cpu().numpy()) + ' '
                         + str(d_pred_cls[0].cpu().numpy()) + ' ' + str(d_output[0, d_pred_cls][0].cpu().numpy()) + ' ' + str(weight[label]) + '\n')
             labels.extend(label.cpu().numpy().tolist())

@@ -132,7 +132,7 @@ def get_mscoco(dataset_root, batch_size, train):
     return mscoco_data_loader
 
 
-def get_m3fd(dataset_root, batch_size, train, test=False):
+def get_m3fd(dataset_root, batch_size, train, test=False, pseudo_label=False):
     """Get M3FD datasets loader
 
     Args:
@@ -144,6 +144,24 @@ def get_m3fd(dataset_root, batch_size, train, test=False):
         obj: dataloader object for M3FD dataset
     """ 
     # dataset and data loader
+    if pseudo_label:
+        pre_process = transforms.Compose([transforms.Resize((224, 224)),
+                                      transforms.RandomHorizontalFlip(),
+                                      transforms.ToTensor(),
+                                      transforms.Normalize(
+                                          mean=(0.4821, 0.4821, 0.4821),
+                                          std=(0.2081, 0.2081, 0.2081))])
+        m3fd_dataset = datasets.ImageFolder(root=os.path.join(dataset_root, 'uda_data/m3fd/train'),
+                                             transform=pre_process)
+        
+        m3fd_data_loader = torch.utils.data.DataLoader(
+            dataset=m3fd_dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=1, pin_memory=True, drop_last=False)
+
+        return m3fd_data_loader, m3fd_dataset.samples
+    
     if train:
         pre_process = transforms.Compose([transforms.Resize((224, 224)),
                                       transforms.RandomHorizontalFlip(),
@@ -172,13 +190,17 @@ def get_m3fd(dataset_root, batch_size, train, test=False):
         if test:
             m3fd_dataset = datasets.ImageFolder(root=os.path.join(dataset_root, 'uda_data/m3fd/test'),
                                                 transform=pre_process)
+            m3fd_data_loader = torch.utils.data.DataLoader(
+                dataset=m3fd_dataset,
+                batch_size=1,
+                shuffle=False, num_workers=4, pin_memory=True, drop_last=False)
         else:
             m3fd_dataset = datasets.ImageFolder(root=os.path.join(dataset_root, 'uda_data/m3fd/val'),
                                                 transform=pre_process)
-        m3fd_data_loader = torch.utils.data.DataLoader(
-            dataset=m3fd_dataset,
-            batch_size=batch_size,
-            shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
+            m3fd_data_loader = torch.utils.data.DataLoader(
+                dataset=m3fd_dataset,
+                batch_size=batch_size,
+                shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 
     return m3fd_data_loader
 
@@ -290,4 +312,37 @@ def get_flir_from_list_wdomain(dataset_root, batch_size, train):
             batch_size=batch_size,
             shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 
+    return flir_data_loader
+
+def get_m3fd_from_list_wdomain(dataset_root, batch_size, train):
+    """Get M3FD datasets loader
+
+    Args:
+        dataset_root (str): path to the dataset folder
+        batch_size (int): batch size
+        train (bool): create loader for training or test set
+
+    Returns:
+        obj: dataloader object for M3FD dataset
+    """ 
+    # dataset and data loader
+    if train:
+        pre_process = transforms.Compose([transforms.Resize((224, 224)),
+                                      transforms.ToTensor(),
+                                      transforms.Normalize(
+                                          mean=(0.4821, 0.4821, 0.4821),
+                                          std=(0.2081, 0.2081, 0.2081))])
+        m3fd_dataset = ImageFileListWeightDomain(root=dataset_root, imageFolder='uda_data/m3fd/train', flist=os.path.join(dataset_root, 'uda_data/m3fd', 'pseudo_labels_m3fd.txt'),
+                                            transform=pre_process)
+        weight = m3fd_dataset.weights
+        weight = torch.DoubleTensor(weight)
+
+        sampler = torch.utils.data.sampler.WeightedRandomSampler(weight, len(weight))
+
+        m3fd_data_loader = torch.utils.data.DataLoader(
+            dataset=flir_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            sampler=sampler, num_workers=4, pin_memory=True, drop_last=True)
+    
     return flir_data_loader
