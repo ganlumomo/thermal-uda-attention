@@ -2,6 +2,8 @@ dataset_dir*
 wandb*
 outputs*
 sgada_domain*
+train.sh
+test.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -71,7 +71,8 @@ def visualize_cls(feature: torch.Tensor, label: torch.Tensor,
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
     ax.spines['left'].set_visible(False)
-    plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=labels, cmap=col.ListedColormap(['#E9002D', '#FFAA00', '#00B000']), s=20)
+    plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=labels, cmap=col.ListedColormap(['#E9002D', '#FFAA00', '#00B000']), s=20) # flir
+    plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=labels, cmap=col.ListedColormap(['#AF58BA', '#FFAA00', '#009ADE', '#E9002D', '#00B000', '#A0B1BA']), s=20) # m3fd
     plt.xticks([])
     plt.yticks([])
     plt.savefig(filename)

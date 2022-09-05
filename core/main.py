@@ -11,7 +11,7 @@ from networks.discriminator import Discriminator
 from core.trainer import train_model
 from utils.utils import get_logger
 from utils.altutils import get_mscoco, get_flir, get_flir_from_list_wdomain
-from utils.altutils import get_m3fd
+from utils.altutils import get_m3fd, get_m3fd_from_list_wdomain
 from utils.altutils import setLogger
 import logging
 import wandb
@@ -39,6 +39,7 @@ def run(args):
     elif args.tgt_cat == 'm3fd':
         target_train_loader = get_m3fd(dataset_root, args.batch_size, train=True)
         target_val_loader = get_m3fd(dataset_root, args.batch_size, train=False)
+        target_conf_train_loader = get_m3fd_from_list_wdomain(dataset_root, args.batch_size, train=True)
     else:
         raise ValueError("Target dataset {} is not defined.".format(args.tgt_cat))
 
@@ -136,7 +137,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=15)
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--lam', type=float, default=0.25)
-    parser.add_argument('--thr', type=float, default=0.79)
+    parser.add_argument('--thr', type=float, default=0.90)
     parser.add_argument('--thr_domain', type=float, default=0.87)
     parser.add_argument('--num_val', type=int, default=6)  # number of val. within each epoch
     # misc

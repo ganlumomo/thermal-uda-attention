@@ -90,21 +90,26 @@ def run(args):
         target_cnn.load_state_dict(c['model'])
         logger.info('Loaded `{}`'.format(args.t_trained))
 
-    '''
     # Model Analysis
-    source_feature, source_label = collect_feature(target_val_loader, source_cnn.encoder, args.device, task=None)
-    #target_feature, target_label = collect_feature(target_val_loader, model, args.device, task='target')
+    if args.trained:
+        target_feature, target_label = collect_feature(target_val_loader, model, args.device, task='target')
+    elif args.t_trained:
+        target_feature, target_label = collect_feature(target_val_loader, target_cnn.encoder, args.device, task=None)
+    elif args.s_trained:
+        source_feature, source_label = collect_feature(target_val_loader, source_cnn.encoder, args.device, task=None)
     # plot t-SNE
     tSNE_filename = os.path.join(args.logdir, 'TSNE.pdf')
-    #tsne.visualize(source_feature, target_feature, tSNE_filename)
-    tsne.visualize_cls(source_feature, source_label, tSNE_filename)
+    if args.s_trained:
+        tsne.visualize(source_feature, target_feature, tSNE_filename)
+    else:
+        tsne.visualize_cls(target_feature, target_label, tSNE_filename)
     print("Saving t-SNE to", tSNE_filename)
-    return
-    '''
 
     # testing
-    #testing = test(target_cnn, discriminator, target_val_loader, task=None, datapath=None, args=args)
-    testing = test(model, discriminator, target_val_loader, task='target', datapath=None, args=args)
+    if args.t_trained:
+        testing = test(target_cnn, discriminator, target_val_loader, task=None, datapath=None, args=args)
+    elif args.trained:
+        testing = test(model, discriminator, target_val_loader, task='target', datapath=None, args=args)
     best_acc = testing['avgAcc']
     best_class = testing['classAcc']
     classNames = testing['classNames']
@@ -122,7 +127,7 @@ def run(args):
 def step(model, data, label, task, args):
     data, label = data.to(args.device), label.to(args.device)
     if task:
-        output, feat  = model(data, task=task)
+        output, feat = model(data, task=task)
     else:
         output = model(data)
         feat = model.encoder(data)

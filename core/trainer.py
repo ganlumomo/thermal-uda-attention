@@ -134,7 +134,7 @@ def train(
     for iter_i in range(n_iters):
         source_data, source_label = next(source_iter)
         target_data, target_label = next(target_iter)
-        #target_data, target_target, target_conf, target_domain, target_domain_conf = target_iter.next()
+        #target_data, target_label, target_conf, target_domain, target_domain_conf = next(target_iter)
         #target_conf = target_conf.to(args.device)
         #target_domain = target_domain.to(args.device)
         #target_domain_conf = target_domain_conf.to(args.device)
@@ -157,13 +157,13 @@ def train(
         lossS = criterion(source_pred, source_label)
         # self-training
         '''
-        validSource = (target_domain == 0) & (target_conf >= args.thr)
+        target_pred, target_feat = model(target_data, task='target')
+        validSource = (target_domain == 0) & (target_domain_conf >= args.thr_domain) & (target_conf >= args.thr)
         validMaskSource = validSource.nonzero(as_tuple=False)[:, 0]
         validTarget = (target_domain == 1) & (target_domain_conf <= args.thr_domain) & (target_conf >= args.thr)
         validMaskTarget = validTarget.nonzero(as_tuple=False)[:, 0]
         validIndexes = torch.cat((validMaskSource, validMaskTarget), 0)
         lossT = criterion(target_pred[validIndexes], target_label[validIndexes])
-        loss = lossS + lossT
         '''
         loss = lossS
         optimizer.zero_grad()

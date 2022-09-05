@@ -340,9 +340,9 @@ def get_m3fd_from_list_wdomain(dataset_root, batch_size, train):
         sampler = torch.utils.data.sampler.WeightedRandomSampler(weight, len(weight))
 
         m3fd_data_loader = torch.utils.data.DataLoader(
-            dataset=flir_dataset,
+            dataset=m3fd_dataset,
             batch_size=batch_size,
             shuffle=False,
             sampler=sampler, num_workers=4, pin_memory=True, drop_last=True)
     
-    return flir_data_loader
+    return m3fd_data_loader
