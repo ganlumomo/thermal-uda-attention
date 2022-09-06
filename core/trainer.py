@@ -33,25 +33,31 @@ def train_model(
     d_optimizer,
     source_train_loader,
     target_train_loader,
+    target_conf_train_loader,
     target_test_loader,
     logger,
-    wandb,
+    wandb=None,
     args=None
 ):
-    validation = validate(model, target_test_loader, criterion, task='source', args=args)
-    log_source = 'Source/Acc {:.3f} '.format(validation['avgAcc'])
-
     try:
         best_score = None
         best_class_score = None
         for epoch_i in range(args.epochs):
             start_time = time()
-            training = train(
-                model, discriminator,
-                source_train_loader, target_train_loader, target_test_loader,
-                criterion, d_criterion, optimizer, t_optimizer, d_optimizer,
-                best_score, best_class_score, epoch_i, logger, wandb, args=args
-            )
+            if args.self_train:
+                training = self_train(
+                    model, target_conf_train_loader, target_test_loader,
+                    criterion, t_optimizer,
+                    best_score, best_class_score, epoch_i, logger, wandb, args=args
+                )
+            else:
+                training = train(
+                    model, discriminator,
+                    source_train_loader, target_train_loader, target_test_loader,
+                    criterion, d_criterion, optimizer, t_optimizer, d_optimizer,
+                    best_score, best_class_score, epoch_i, logger, wandb, args=args
+                )
+            
             # adjust learning rate
             adjust_learning_rate(optimizer, args.lr, epoch_i, args.epochs)
             adjust_learning_rate(t_optimizer, args.t_lr, epoch_i, args.epochs)
@@ -68,15 +74,15 @@ def train_model(
                 training['d/loss'], training['target/loss'])
             log += '[Val] Target/Loss {:.3f} Target/Acc {:.3f} '.format(
                 validation['loss'], validation['acc'])
-            log += log_source
             log += 'Time {:.2f}s'.format(time() - start_time)
             logger.info(log)
             # track epoch validation metrics
-            wandb.log({
-                'val/loss': validation['loss'],
-                'val/acc': validation['acc'],
-                'val/avg_acc': validation['avgAcc']
-            })
+            if wandb:
+                wandb.log({
+                    'val/loss': validation['loss'],
+                    'val/acc': validation['acc'],
+                    'val/avg_acc': validation['avgAcc']
+                })
 
             # save
             is_best = (best_score is None or validation['avgAcc'] > best_score)
@@ -116,7 +122,7 @@ def train(
     model, discriminator,
     source_loader, target_loader, target_test_loader,
     criterion, d_criterion, optimizer, t_optimizer, d_optimizer, 
-    best_score, best_class_score, epoch_i, logger, wandb, args=None
+    best_score, best_class_score, epoch_i, logger, wandb=None, args=None
 ):
     model.train()
     discriminator.train()
@@ -125,7 +131,6 @@ def train(
     best_class_score = best_class_score
 
     losses, d_losses = AverageMeter(), AverageMeter()
-    #n_iters = min(len(source_loader), len(target_loader))
     n_iters = 2500
     valSteps = n_iters//args.num_val
     valStepsList = [valSteps+(x*valSteps) for x in range(args.num_val)]
@@ -134,10 +139,6 @@ def train(
     for iter_i in range(n_iters):
         source_data, source_label = next(source_iter)
         target_data, target_label = next(target_iter)
-        #target_data, target_label, target_conf, target_domain, target_domain_conf = next(target_iter)
-        #target_conf = target_conf.to(args.device)
-        #target_domain = target_domain.to(args.device)
-        #target_domain_conf = target_domain_conf.to(args.device)
         source_data = source_data.to(args.device)
         source_label = source_label.to(args.device)
         target_data = target_data.to(args.device)
@@ -155,16 +156,6 @@ def train(
         set_params_grad(optimizer, requires_grad=True)
         source_pred, source_feat = model(source_data, task='source')
         lossS = criterion(source_pred, source_label)
-        # self-training
-        '''
-        target_pred, target_feat = model(target_data, task='target')
-        validSource = (target_domain == 0) & (target_domain_conf >= args.thr_domain) & (target_conf >= args.thr)
-        validMaskSource = validSource.nonzero(as_tuple=False)[:, 0]
-        validTarget = (target_domain == 1) & (target_domain_conf <= args.thr_domain) & (target_conf >= args.thr)
-        validMaskTarget = validTarget.nonzero(as_tuple=False)[:, 0]
-        validIndexes = torch.cat((validMaskSource, validMaskTarget), 0)
-        lossT = criterion(target_pred[validIndexes], target_label[validIndexes])
-        '''
         loss = lossS
         optimizer.zero_grad()
         loss.backward()
@@ -197,13 +188,13 @@ def train(
         d_losses.update(d_loss.item(), bs)
 
         # track training metrics
-        wandb.log({
-            'train/d_loss': d_loss.item(),
-            'train/loss_g': lossG.item(),
-            'train/loss_s': lossS.item(),
-            #'train/loss_t': lossT.item(),
-            'train/loss': loss.item()
-        })
+        if wandb:
+            wandb.log({
+                'train/d_loss': d_loss.item(),
+                'train/loss_g': lossG.item(),
+                'train/loss_s': lossS.item(),
+                'train/loss': loss.item()
+            })
 
         if iter_i in vals:
             validation = validate(
@@ -238,13 +229,93 @@ def train(
                 classWiseDict[clss] = validation['classAcc'][cls_idx].item()
 
             # track validation metrics
-            wandb.log({
-                'val/loss': validation['loss'],
-                'val/acc': validation['acc'],
-                'val/avg_acc': validation['avgAcc']
-            })
+            if wandb:
+                wandb.log({
+                    'val/loss': validation['loss'],
+                    'val/acc': validation['acc'],
+                    'val/avg_acc': validation['avgAcc']
+                })
             model.train()
             discriminator.train()
+
+    return {'d/loss': d_losses.avg, 'target/loss': losses.avg, 'best_score': best_score, 'best_class_score': best_class_score, 'n_iters': n_iters}
+
+
+def self_train(
+    model, target_loader, target_test_loader,
+    criterion, t_optimizer,
+    best_score, best_class_score, epoch_i, logger, wandb=None, args=None
+):
+    model.train()
+
+    best_score = best_score
+    best_class_score = best_class_score
+
+    losses, d_losses = AverageMeter(), AverageMeter()
+    n_iters = len(target_loader)
+    valSteps = n_iters//args.num_val
+    valStepsList = [valSteps+(x*valSteps) for x in range(args.num_val)]
+    vals = valStepsList[:-1]
+    target_iter = iter(target_loader)
+    for iter_i in range(n_iters):
+        target_data, target_label, target_conf, target_domain, target_domain_conf = target_iter.next()
+        target_conf = target_conf.to(args.device)
+        target_domain = target_domain.to(args.device)
+        target_domain_conf = target_domain_conf.to(args.device)
+        target_data = target_data.to(args.device)
+        target_label = target_label.to(args.device)
+        bs = target_data.size(0)
+        
+        # self-training
+        target_pred, target_feat = model(target_data, task='target')
+        validSource = (target_domain == 0) & (target_domain_conf >= args.thr_domain) & (target_conf >= args.thr)
+        validMaskSource = validSource.nonzero(as_tuple=False)[:, 0]
+        validTarget = (target_domain == 1) & (target_domain_conf <= args.thr_domain) & (target_conf >= args.thr)
+        validMaskTarget = validTarget.nonzero(as_tuple=False)[:, 0]
+        validIndexes = torch.cat((validMaskSource, validMaskTarget), 0)
+        lossT = criterion(target_pred[validIndexes], target_label[validIndexes])
+        loss = lossT
+        t_optimizer.zero_grad()
+        loss.backward()
+        t_optimizer.step()
+        losses.update(loss.item(), bs)
+
+        # track training metrics
+        if wandb:
+            wandb.log({'train/loss_t': lossT.item()})
+
+        if iter_i in vals:
+            validation = validate(
+                model, target_test_loader, 
+                criterion, task='target', args=args)
+            clsNames = validation['classNames']
+            is_best = (best_score is None or validation['avgAcc'] > best_score)
+            best_score = validation['avgAcc'] if is_best else best_score
+            best_class_score = validation['classAcc'] if is_best else best_class_score
+            state_dict = {
+                'model': model.state_dict(),
+                't_optimizer': t_optimizer.state_dict(),
+                'epoch': epoch_i,
+                'val/avg_acc': best_score,
+            }
+            save(args.logdir, state_dict, is_best)
+            logger.info('Epoch_{} Iter_{}'.format(epoch_i, iter_i))
+            for cls_idx, clss in enumerate(clsNames):
+                logger.info('{}: {}'.format(clss, validation['classAcc'][cls_idx]))
+            logger.info('Current val. acc.: {}'.format(validation['avgAcc']))
+            logger.info('Best val. acc.: {}'.format(best_score))
+            classWiseDict = {}
+            for cls_idx, clss in enumerate(clsNames):
+                classWiseDict[clss] = validation['classAcc'][cls_idx].item()
+
+            # track validation metrics
+            if wandb:
+                wandb.log({
+                    'val/loss': validation['loss'],
+                    'val/acc': validation['acc'],
+                    'val/avg_acc': validation['avgAcc']
+                })
+            model.train()
 
     return {'d/loss': d_losses.avg, 'target/loss': losses.avg, 'best_score': best_score, 'best_class_score': best_class_score, 'n_iters': n_iters}
 

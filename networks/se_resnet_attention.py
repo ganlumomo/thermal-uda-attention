@@ -40,7 +40,7 @@ class ConvCoupledBatchNormMT(nn.Module):
 
         # Batch Norm layer(s)
         if tasks is not None:
-            print('Using per-task batchnorm parameters in Encoder: Downsampling')
+            #print('Using per-task batchnorm parameters in Encoder: Downsampling')
             self.norm = nn.ModuleDict({task: norm(**norm_kwargs) for task in self.tasks})
         else:
             self.norm = norm(**norm_kwargs)
@@ -77,11 +77,11 @@ class SEBottleneck(nn.Module):
         self.conv3 = nn.Conv2d(planes, planes * 4, kernel_size=1, bias=False)
 
         if self.adapters:
-            print('Using parallel adapters in Encoder')
+            #print('Using parallel adapters in Encoder')
             self.adapt = nn.ModuleDict({task: nn.Conv2d(planes, planes, kernel_size=1, bias=False) for task in tasks})
 
         if self.per_task_norm_layers:
-            print('Using per-task batchnorm parameters in Encoder')
+            #print('Using per-task batchnorm parameters in Encoder')
             self.bn1 = nn.ModuleDict({task: self.bnorm(planes, affine=affine_par) for task in tasks})
             self.bn2 = nn.ModuleDict({task: self.bnorm(planes, affine=affine_par) for task in tasks})
             self.bn3 = nn.ModuleDict({task: self.bnorm(planes * 4, affine=affine_par) for task in tasks})
@@ -246,8 +246,8 @@ class ResNet(nn.Module):
                     verify_trainable = (verify_trainable and y.requires_grad)
                 a += isinstance(x, nn.BatchNorm2d)
 
-        print("\nVerification: Trainable batchnorm parameters? Answer: {}\n".format(verify_trainable))
-        print("Asynchronous bnorm layers: {}".format(a))
+        #print("\nVerification: Trainable batchnorm parameters? Answer: {}\n".format(verify_trainable))
+        #print("Asynchronous bnorm layers: {}".format(a))
 
     def forward(self, x_in, task=None):
 
@@ -366,8 +366,8 @@ class ResNet(nn.Module):
                 module_trg.bias.data = deepcopy(module_src.bias.data)
                 i += 1
 
-        print('\nContent of {} out of {} layers successfully copied, including {} task-specific layers\n'
-              .format(i, len(mapping), task_specific_counter))
+        #print('\nContent of {} out of {} layers successfully copied, including {} task-specific layers\n'
+        #      .format(i, len(mapping), task_specific_counter))
 
 
 def get_lr_params(model, part='all', tasks=None):

@@ -18,7 +18,6 @@ from utils.analysis import collect_feature, tsne
 from sklearn.metrics import accuracy_score
 import numpy as np
 import logging
-import wandb
 
 
 def count_parameters(model):
@@ -90,26 +89,26 @@ def run(args):
         target_cnn.load_state_dict(c['model'])
         logger.info('Loaded `{}`'.format(args.t_trained))
 
-    # Model Analysis
-    if args.trained:
-        target_feature, target_label = collect_feature(target_val_loader, model, args.device, task='target')
-    elif args.t_trained:
-        target_feature, target_label = collect_feature(target_val_loader, target_cnn.encoder, args.device, task=None)
-    elif args.s_trained:
-        source_feature, source_label = collect_feature(target_val_loader, source_cnn.encoder, args.device, task=None)
     # plot t-SNE
-    tSNE_filename = os.path.join(args.logdir, 'TSNE.pdf')
-    if args.s_trained:
-        tsne.visualize(source_feature, target_feature, tSNE_filename)
-    else:
+    if args.tsne:
+        tSNE_filename = os.path.join(args.logdir, 'TSNE.pdf')
+        if args.trained:
+            target_feature, target_label = collect_feature(target_val_loader, model, args.device, task='target')
+        elif args.t_trained:
+            target_feature, target_label = collect_feature(target_val_loader, target_cnn.encoder, args.device, task=None)
         tsne.visualize_cls(target_feature, target_label, tSNE_filename)
-    print("Saving t-SNE to", tSNE_filename)
+        if args.s_trained:
+            source_feature, source_label = collect_feature(target_val_loader, source_cnn.encoder, args.device, task=None)
+            tsne.visualize(source_feature, target_feature, tSNE_filename)
+        print("Saving t-SNE to", tSNE_filename)
 
     # testing
-    if args.t_trained:
-        testing = test(target_cnn, discriminator, target_val_loader, task=None, datapath=None, args=args)
+    if args.trained and args.d_trained:
+        testing = test(model, discriminator, target_train_loader, task='target', datapath=data_path, args=args) # generate pseudo labels
     elif args.trained:
         testing = test(model, discriminator, target_val_loader, task='target', datapath=None, args=args)
+    elif args.t_trained:
+        testing = test(target_cnn, discriminator, target_val_loader, task=None, datapath=None, args=args)
     best_acc = testing['avgAcc']
     best_class = testing['classAcc']
     classNames = testing['classNames']
@@ -162,8 +161,10 @@ def test(model, discriminator, dataloader, task, datapath=None, args=None):
                 d_output = discriminator(d_input)
                 d_pred_cls = d_output.data.max(1)[1]
                 d_output = torch.softmax(d_output, dim=1)
-                #weight = [17.13749324689357, 1.6411775357632512, 3.0090590020868904] # flir
-                weight = [57.05215419501134, 1.940010794972627, 13.228180862250262, 65.86387434554973, 2.8688711516533636, 36.14942528735632] # m3fd
+                if args.tgt_cat == 'flir':
+                    weight = [17.13749324689357, 1.6411775357632512, 3.0090590020868904]
+                elif args.tgt_cat == 'm3fd':
+                    weight = [57.05215419501134, 1.940010794972627, 13.228180862250262, 65.86387434554973, 2.8688711516533636, 36.14942528735632]
                 f.write(datapath[int(iter_i)][0][34:] + ' ' + str(pred_cls[0].cpu().numpy()) + ' ' + str(output[0, pred_cls][0].cpu().numpy()) + ' '
                         + str(d_pred_cls[0].cpu().numpy()) + ' ' + str(d_output[0, d_pred_cls][0].cpu().numpy()) + ' ' + str(weight[label]) + '\n')
             labels.extend(label.cpu().numpy().tolist())
@@ -191,20 +192,11 @@ if __name__ == '__main__':
     parser.add_argument('--s_trained', type=str, default='')
     parser.add_argument('--t_trained', type=str, default='')
     parser.add_argument('--slope', type=float, default=0.2)
-    # train
-    parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--t_lr', type=float, default=1e-5)
-    parser.add_argument('--d_lr', type=float, default=1e-3)
-    parser.add_argument('--betas', type=float, nargs='+', default=(.5, .999))
-    parser.add_argument('--weight_decay', type=float, default=2.5e-5)
-    parser.add_argument('--epochs', type=int, default=15)
+    # test
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--lam', type=float, default=0.25)
-    parser.add_argument('--thr', type=float, default=0.79)
-    parser.add_argument('--thr_domain', type=float, default=0.87)
-    parser.add_argument('--num_val', type=int, default=6)  # number of val. within each epoch
+    parser.add_argument('--tsne', action="store_true")
     # misc
-    parser.add_argument('--device', type=str, default='cuda:1')
+    parser.add_argument('--device', type=str, default='cuda:0')
     parser.add_argument('--n_workers', type=int, default=4)
     parser.add_argument('--logdir', type=str, default='outputs/')
     # office dataset categories

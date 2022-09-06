@@ -45,10 +45,10 @@ class SELayerMultiTaskDict(nn.Module):
                                      nn.Linear(channel // reduction, channel),
                                      nn.Sigmoid())
         else:
-            print('Initializing squeeze and excitation modules:')
+            #print('Initializing squeeze and excitation modules:')
             self.fc = nn.ModuleDict()
             for task in self.tasks:
-                print('SE for task: {}'.format(task))
+                #print('SE for task: {}'.format(task))
                 self.fc[task] = SequentialMultiTask(nn.Linear(channel, channel // reduction),
                                                     nn.ReLU(inplace=True),
                                                     nn.Linear(channel // reduction, channel),
@@ -99,7 +99,7 @@ class ConvCoupledSE(nn.Module):
             self.se = se_module(process_layers[-1].out_channels, tasks=tasks, reduction=reduction)
 
         if self.adapters:
-            print('Using parallel adapters')
+            #print('Using parallel adapters')
             self.adapt = nn.ModuleDict({task: nn.Conv2d(process_layers[-1].in_channels, process_layers[-1].out_channels,
                                                         kernel_size=1, bias=False) for task in tasks})
 

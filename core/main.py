@@ -14,7 +14,6 @@ from utils.altutils import get_mscoco, get_flir, get_flir_from_list_wdomain
 from utils.altutils import get_m3fd, get_m3fd_from_list_wdomain
 from utils.altutils import setLogger
 import logging
-import wandb
 
 
 def get_train_params(model, part, tasks, lr):
@@ -72,10 +71,13 @@ def run(args):
         'train_norm_layers': train_norm_layers
     }
     config.update({arg: getattr(args, arg) for arg in vars(args)})
-    wandb.init(
-        project='thermal-uda-cls',
-        config=config
-    )
+    wandb = None
+    if args.wandb:
+        import wandb
+        wandb.init(
+            project='thermal-uda-cls',
+            config=config
+        )
     
     # classification criterion
     criterion = nn.CrossEntropyLoss().to(args.device)
@@ -101,7 +103,7 @@ def run(args):
     best_acc, best_class, classNames = train_model(
         model, discriminator, criterion, d_criterion,
         optimizer, t_optimizer, d_optimizer,
-        source_train_loader, target_train_loader, target_val_loader,
+        source_train_loader, target_train_loader, target_conf_train_loader, target_val_loader,
         logger, wandb, args=args)
 
     # log results
@@ -111,12 +113,8 @@ def run(args):
     logger.info('Best acc.: {}'.format(best_acc))
     logger.info('Best acc. (Classwise):')
     logger.info(bestClassWiseDict)
-    wandb.log({
-        'val/best_acc': best_acc,
-        'val/best_acc_bicycle': best_class[0].item(),
-        'val/best_acc_car': best_class[1].item(),
-        'val/best_acc_person': best_class[2].item()
-    })
+    if wandb:
+        wandb.log({'val/best_acc': best_acc})
     
     return best_acc, bestClassWiseDict
 
@@ -129,6 +127,7 @@ if __name__ == '__main__':
     parser.add_argument('--trained', type=str, default='')
     parser.add_argument('--slope', type=float, default=0.2)
     # train
+    parser.add_argument('--self_train', action="store_true")
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--t_lr', type=float, default=1e-5)
     parser.add_argument('--d_lr', type=float, default=1e-3)
@@ -144,10 +143,10 @@ if __name__ == '__main__':
     parser.add_argument('--device', type=str, default='cuda:0')
     parser.add_argument('--n_workers', type=int, default=4)
     parser.add_argument('--logdir', type=str, default='outputs/')
-    # office dataset categories
+    parser.add_argument('--wandb', action="store_true")
+    # dataset categories
     parser.add_argument('--src_cat', type=str, default='mscoco')
     parser.add_argument('--tgt_cat', type=str, default='flir')
-    parser.add_argument('--tgt_conf_cat', type=str, default='flir_confident')
     parser.add_argument('--message', type=str, default='altinel')  # to track parallel device outputs
 
     args, unknown = parser.parse_known_args()

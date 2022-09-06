@@ -356,7 +356,6 @@ def se_resnet50(num_classes=1000, pretrained=False, features=False, attention='s
     model.avgpool = nn.AdaptiveAvgPool2d(1)
 
     if pretrained:
-        print('Loading se_resnet50 Imagenet')
         new_state_dict = get_state_dict_se(attention + '_resnet50')
 
         # Load pre-trained IN model
